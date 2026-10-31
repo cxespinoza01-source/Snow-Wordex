@@ -76,8 +76,8 @@ fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
         FileDialog::new()
             .set_title("Choose a picture")
             .set_filters([
-                ("Images", ["png", "jpg", "jpeg", "gif", "webp", "bmp"]),
-                ("All files", ["*"]),
+                ("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"][..]),
+                ("All files", &["*"][..]),
             ])
     } else {
         FileDialog::new()
@@ -88,9 +88,9 @@ fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
                     [
                         "docx", "docm", "dotx", "dotm", "doc", "dot", "odt", "rtf", "txt",
                         "md", "markdown", "html", "htm", "tex", "latex", "ltx", "json", "xml",
-                    ],
+                    ][..],
                 ),
-                ("All files", ["*"]),
+                ("All files", &["*"][..]),
             ])
     }
 }
