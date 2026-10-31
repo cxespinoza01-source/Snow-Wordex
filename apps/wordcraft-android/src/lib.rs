@@ -20,7 +20,7 @@ pub fn create_app(ctx: eframe::egui::Context) -> WordApp {
     WordApp::new(session, android_services(ctx))
 }
 
-fn android_services(ctx: egui::Context) -> Services {
+fn android_services(ctx: eframe::egui::Context) -> Services {
     let file_dialog: Box<dyn Fn(FileDialogRequest) -> Receiver<FileDialogAnswer>> =
         Box::new(move |request| {
             let (tx, rx) = channel();
@@ -85,7 +85,7 @@ fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
             .set_filters([
                 (
                     "WordCraft documents",
-                    [
+                    &[
                         "docx", "docm", "dotx", "dotm", "doc", "dot", "odt", "rtf", "txt",
                         "md", "markdown", "html", "htm", "tex", "latex", "ltx", "json", "xml",
                     ][..],
