@@ -34,10 +34,8 @@ fn android_services(ctx: eframe::egui::Context) -> Services {
             };
 
             let Some(purpose) = purpose else {
-                let _ = tx.send(Err(
-                    "Android Save As still needs a writable Storage Access Framework provider."
-                        .to_owned(),
-                ));
+                log::warn!("Android Save As is not implemented yet; cancelling the save request");
+                let _ = tx.send(Ok(Vec::new()));
                 repaint.request_repaint();
                 return rx;
             };
@@ -45,7 +43,9 @@ fn android_services(ctx: eframe::egui::Context) -> Services {
             let dialog = android_open_dialog(&purpose);
             let callback_repaint = repaint.clone();
             let callback_tx = tx.clone();
-            let callback = move |picked: robius_file_picker::Result<Option<robius_file_picker::PickedFile>>| {
+            let callback = move |
+                picked: robius_file_picker::Result<Option<robius_file_picker::PickedFile>>,
+            | {
                 let answer = match picked {
                     Ok(Some(file)) => stage_picked_file(file)
                         .map(|path| vec![path.to_string_lossy().into_owned()]),
@@ -72,15 +72,14 @@ fn android_services(ctx: eframe::egui::Context) -> Services {
 fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
     use robius_file_picker::FileDialog;
 
-    if purpose == "picture" {
-        FileDialog::new()
+    match purpose {
+        "picture" => FileDialog::new()
             .set_title("Choose a picture")
             .set_filters([
                 ("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"][..]),
                 ("All files", &["*"][..]),
-            ])
-    } else {
-        FileDialog::new()
+            ]),
+        "document" => FileDialog::new()
             .set_title("Open a document")
             .set_filters([
                 (
@@ -91,7 +90,10 @@ fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
                     ][..],
                 ),
                 ("All files", &["*"][..]),
-            ])
+            ]),
+        _ => FileDialog::new()
+            .set_title("Choose a file")
+            .set_filters([("All files", &["*"][..])]),
     }
 }
 
