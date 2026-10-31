@@ -444,9 +444,6 @@ impl WordApp {
             }
         }
     }
-}
-
-
     /// Clear the filesystem backing of a document imported through Android's SAF picker.
     /// The path points at a disposable cache copy, not the provider's writable original.
     #[cfg(target_os = "android")]
@@ -457,3 +454,5 @@ impl WordApp {
             .file_name()
             .map(|name| name.to_string_lossy().into_owned());
     }
+
+}
