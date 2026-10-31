@@ -5,13 +5,18 @@
 //! currently opens filesystem paths. Imported copies are deleted after parsing; the opened document
 //! is left unnamed so Save asks for a destination instead of overwriting an inaccessible cache copy.
 
+#[cfg(target_os = "android")]
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "android")]
 use std::sync::mpsc::{Receiver, channel};
 
+#[cfg(target_os = "android")]
 use wordcraft_engine::Session;
+#[cfg(target_os = "android")]
 use wordcraft_ui_egui::{FileDialogAnswer, FileDialogRequest, Services, WordApp};
 
 /// Construct the shared editor with Android's document picker service.
+#[cfg(target_os = "android")]
 pub fn create_app(ctx: eframe::egui::Context) -> WordApp {
     let region = wordcraft_ui_egui::i18n::system_region();
     let document = wordcraft_engine::blank_document(&region);
@@ -20,6 +25,7 @@ pub fn create_app(ctx: eframe::egui::Context) -> WordApp {
     WordApp::new(session, android_services(ctx))
 }
 
+#[cfg(target_os = "android")]
 fn android_services(ctx: eframe::egui::Context) -> Services {
     let file_dialog: Box<dyn Fn(FileDialogRequest) -> Receiver<FileDialogAnswer>> =
         Box::new(move |request| {
@@ -69,6 +75,7 @@ fn android_services(ctx: eframe::egui::Context) -> Services {
     }
 }
 
+#[cfg(target_os = "android")]
 fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
     use robius_file_picker::FileDialog;
 
@@ -98,6 +105,7 @@ fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
 }
 
 /// Convert the SAF URI to a short-lived regular path for the current path-based engine API.
+#[cfg(target_os = "android")]
 fn stage_picked_file(file: robius_file_picker::PickedFile) -> Result<PathBuf, String> {
     let display_name = file
         .file_name()
