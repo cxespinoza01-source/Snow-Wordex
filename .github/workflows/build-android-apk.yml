@@ -71,6 +71,9 @@ jobs:
           echo "CC_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
           echo "CXX_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android26-clang++" >> "$GITHUB_ENV"
           echo "AR_aarch64_linux_android=$TOOLCHAIN/llvm-ar" >> "$GITHUB_ENV"
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-35/android.jar"
+          test -f "$ANDROID_JAR"
+          echo "ANDROID_JAR=$ANDROID_JAR" >> "$GITHUB_ENV"
 
       - name: Check Rust library for Android
         run: cargo check -p wordcraft-android --lib --target aarch64-linux-android
