@@ -9,8 +9,7 @@ description = "Native Android host for the shared WordCraft Rust editor"
 [lib]
 crate-type = ["cdylib", "lib"]
 
-# Do not inherit the workspace's unsafe_code = forbid lint here: eframe's Android native-activity
-# entry point uses platform entry-point attributes, as noted by the upstream eframe Android example.
+# The GameActivity entry point is exported from lib.rs with the platform-required no_mangle attribute.
 
 [dependencies]
 wordcraft-engine = { workspace = true }
