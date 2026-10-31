@@ -54,3 +54,11 @@ jobs:
 
       - name: Check Android host
         run: cargo check -p wordcraft-android --target aarch64-linux-android
+
+      - name: Upload resolved lockfile for dependency review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-resolved-lockfile
+          path: Cargo.lock
+          if-no-files-found: error
