@@ -1,15 +1,7 @@
-//! Android entry point. On desktop this binary only provides a helpful build hint.
-
-#[cfg(target_os = "android")]
-fn main() -> eframe::Result {
-    eframe::run_native(
-        "WordCraft",
-        eframe::NativeOptions::default(),
-        Box::new(|_cc| Ok(Box::new(wordcraft_android::create_app()))),
-    )
-}
+//! Android is launched through the exported android_main entry point in lib.rs.
+//! This binary is only a host-side hint for developers browsing the workspace.
 
 #[cfg(not(target_os = "android"))]
 fn main() {
-    eprintln!("wordcraft-android is an Android target; see apps/wordcraft-android/README.md");
+    eprintln!("wordcraft-android is an Android target; build the native library from the repository root. See apps/wordcraft-android/README.md");
 }
