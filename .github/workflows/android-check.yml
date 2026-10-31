@@ -40,6 +40,8 @@ jobs:
 
       - name: Install Android SDK and NDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ndk;27.2.12479018
 
       - name: Configure Android NDK linker
         shell: bash
