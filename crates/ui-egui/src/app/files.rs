@@ -445,3 +445,15 @@ impl WordApp {
         }
     }
 }
+
+
+    /// Clear the filesystem backing of a document imported through Android's SAF picker.
+    /// The path points at a disposable cache copy, not the provider's writable original.
+    #[cfg(target_os = "android")]
+    pub(crate) fn forget_temporary_import_path(&mut self, path: &str) {
+        self.session.path = None;
+        self.autosave_path = None;
+        self.session.file_name = std::path::Path::new(path)
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned());
+    }
