@@ -4,14 +4,14 @@
 
     <application
         android:allowBackup="false"
-        android:hasCode="false"
+        android:hasCode="true"
         android:label="WordCraft"
         android:resizeableActivity="true"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
-            android:name="android.app.NativeActivity"
+            android:name="com.google.androidgamesdk.GameActivity"
             android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|uiMode|density"
             android:exported="true"
             android:label="WordCraft"
