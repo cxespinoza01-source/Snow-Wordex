@@ -12,7 +12,7 @@ use wordcraft_engine::Session;
 use wordcraft_ui_egui::{FileDialogAnswer, FileDialogRequest, Services, WordApp};
 
 /// Construct the shared editor with Android's document picker service.
-pub fn create_app(ctx: egui::Context) -> WordApp {
+pub fn create_app(ctx: eframe::egui::Context) -> WordApp {
     let region = wordcraft_ui_egui::i18n::system_region();
     let document = wordcraft_engine::blank_document(&region);
     let mut session = Session::new(document);
@@ -44,6 +44,7 @@ fn android_services(ctx: egui::Context) -> Services {
 
             let dialog = android_open_dialog(&purpose);
             let callback_repaint = repaint.clone();
+            let callback_tx = tx.clone();
             let callback = move |picked: robius_file_picker::Result<Option<robius_file_picker::PickedFile>>| {
                 let answer = match picked {
                     Ok(Some(file)) => stage_picked_file(file)
@@ -51,7 +52,7 @@ fn android_services(ctx: egui::Context) -> Services {
                     Ok(None) => Ok(Vec::new()),
                     Err(error) => Err(error.to_string()),
                 };
-                let _ = tx.send(answer);
+                let _ = callback_tx.send(answer);
                 callback_repaint.request_repaint();
             };
 
