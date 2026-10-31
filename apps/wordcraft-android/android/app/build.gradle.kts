@@ -41,6 +41,7 @@ val buildRustAndroid by tasks.registering(Exec::class) {
     )
     inputs.files(
         fileTree(repositoryRoot.resolve("apps/wordcraft-android/src")),
+        fileTree(repositoryRoot.resolve("crates")),
         repositoryRoot.resolve("apps/wordcraft-android/Cargo.toml"),
         repositoryRoot.resolve("Cargo.toml"),
         repositoryRoot.resolve("Cargo.lock")
