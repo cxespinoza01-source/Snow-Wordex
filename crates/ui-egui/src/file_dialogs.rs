@@ -494,11 +494,11 @@ impl WordApp {
 #[cfg(test)]
 mod tests;
 
-
 #[cfg(target_os = "android")]
 fn is_android_staged_import(path: &str) -> bool {
     let path = std::path::Path::new(path);
-    path.components().any(|part| part.as_os_str() == "wordcraft-open")
+    path.components()
+        .any(|part| part.as_os_str() == "wordcraft-open")
 }
 
 #[cfg(target_os = "android")]
@@ -509,7 +509,10 @@ fn cleanup_android_staged_import(path: &str) {
     }
     let Some(staging_dir) = path.parent() else { return };
     let Some(picker_dir) = staging_dir.parent() else { return };
-    if picker_dir.file_name().is_none_or(|name| !name.to_string_lossy().starts_with("robius-file-picker-")) {
+    if picker_dir
+        .file_name()
+        .is_none_or(|name| !name.to_string_lossy().starts_with("robius-file-picker-"))
+    {
         return;
     }
     let _ = std::fs::remove_file(path);
