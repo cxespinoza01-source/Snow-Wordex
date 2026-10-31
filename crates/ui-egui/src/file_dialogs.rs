@@ -251,11 +251,7 @@ impl WordApp {
                         // A SAF import is a private cache copy, not a writable path to the original
                         // provider document. Force the next Save to use Save As rather than silently
                         // writing into the app cache.
-                        self.session.path = None;
-                        self.autosave_path = None;
-                        self.session.file_name = std::path::Path::new(&path)
-                            .file_name()
-                            .map(|name| name.to_string_lossy().into_owned());
+                        self.forget_temporary_import_path(&path);
                     }
                     cleanup_android_staged_import(&path);
                 }
