@@ -53,7 +53,7 @@ jobs:
           echo "AR_aarch64_linux_android=$TOOLCHAIN/llvm-ar" >> "$GITHUB_ENV"
 
       - name: Check Android host
-        run: cargo check -p wordcraft-android --target aarch64-linux-android
+        run: cargo check -p wordcraft-android --lib --target aarch64-linux-android
 
       - name: Upload resolved lockfile for dependency review
         if: always()
