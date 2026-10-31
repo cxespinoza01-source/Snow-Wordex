@@ -15,6 +15,22 @@ use wordcraft_engine::Session;
 #[cfg(target_os = "android")]
 use wordcraft_ui_egui::{FileDialogAnswer, FileDialogRequest, Services, WordApp};
 
+/// Thin eframe host: the shared WordApp owns the editor UI, while the platform binary
+/// implements eframe::App and forwards each frame to it (as the desktop host does).
+#[cfg(target_os = "android")]
+struct AndroidHost(WordApp);
+
+#[cfg(target_os = "android")]
+impl eframe::App for AndroidHost {
+    fn logic(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+        self.0.logic(ctx);
+    }
+
+    fn ui(&mut self, ui: &mut eframe::egui::Ui, _frame: &mut eframe::Frame) {
+        self.0.ui(ui);
+    }
+}
+
 /// Construct the shared editor with Android's document picker service.
 #[cfg(target_os = "android")]
 pub fn create_app(ctx: eframe::egui::Context) -> WordApp {
@@ -145,7 +161,7 @@ pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
     if let Err(error) = eframe::run_native(
         "WordCraft",
         options,
-        Box::new(|cc| Ok(Box::new(create_app(cc.egui_ctx.clone())))),
+        Box::new(|cc| Ok(Box::new(AndroidHost(create_app(cc.egui_ctx.clone()))))),
     ) {
         log::error!("WordCraft Android exited with an error: {error}");
     }
