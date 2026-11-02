@@ -1,0 +1,100 @@
+name: Android native check and APK build
+
+on:
+  pull_request:
+    paths:
+      - "apps/wordcraft-android/**"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/android-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/wordcraft-android/**"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/android-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-aarch64:
+    name: Check and package Android arm64 APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: android-aarch64
+
+      - name: Install Android SDK and NDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Configure Android NDK linker
+        shell: bash
+        run: |
+          NDK="${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d -printf '%f\\n' | sort -V | tail -n 1)}"
+          TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          {
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$TOOLCHAIN/aarch64-linux-android26-clang"
+            echo "CC_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android26-clang"
+            echo "CXX_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android26-clang++"
+            echo "AR_aarch64_linux_android=$TOOLCHAIN/llvm-ar"
+          } >> "$GITHUB_ENV"
+
+      - name: Check Android Rust library
+        run: cargo check -p wordcraft-android --lib --target aarch64-linux-android
+
+      - name: Build debug APK
+        working-directory: apps/wordcraft-android/android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wordcraft-android-debug-apk
+          path: apps/wordcraft-android/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload resolved lockfile for dependency review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-resolved-lockfile
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7

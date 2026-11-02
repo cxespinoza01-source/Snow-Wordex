@@ -245,6 +245,16 @@ impl WordApp {
             AfterPick::OpenDocument { document } => {
                 let Some(path) = picked else { return Ok(json!({"cancelled": true})) };
                 let r = self.open_file(&path, Some(document));
+                #[cfg(target_os = "android")]
+                if is_android_staged_import(&path) {
+                    if r.is_ok() {
+                        // A SAF import is a private cache copy, not a writable path to the original
+                        // provider document. Force the next Save to use Save As rather than silently
+                        // writing into the app cache.
+                        self.forget_temporary_import_path(&path);
+                    }
+                    cleanup_android_staged_import(&path);
+                }
                 self.ui.backstage = false;
                 r
             }
@@ -483,3 +493,29 @@ impl WordApp {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(target_os = "android")]
+fn is_android_staged_import(path: &str) -> bool {
+    let path = std::path::Path::new(path);
+    path.components()
+        .any(|part| part.as_os_str() == "wordcraft-open")
+}
+
+#[cfg(target_os = "android")]
+fn cleanup_android_staged_import(path: &str) {
+    let path = std::path::Path::new(path);
+    if !is_android_staged_import(path.to_string_lossy().as_ref()) {
+        return;
+    }
+    let Some(staging_dir) = path.parent() else { return };
+    let Some(picker_dir) = staging_dir.parent() else { return };
+    if picker_dir
+        .file_name()
+        .is_none_or(|name| !name.to_string_lossy().starts_with("robius-file-picker-"))
+    {
+        return;
+    }
+    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_dir(staging_dir);
+    let _ = std::fs::remove_dir(picker_dir);
+}

@@ -1,0 +1,29 @@
+[package]
+name = "wordcraft-android"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Native Android host for the shared WordCraft Rust editor"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+# The GameActivity entry point is exported from lib.rs with the platform-required no_mangle attribute.
+
+[dependencies]
+wordcraft-engine = { workspace = true }
+wordcraft-ui-egui = { workspace = true }
+eframe = { workspace = true, default-features = false, features = ["default_fonts", "glow", "android-game-activity", "accesskit"] }
+log = { workspace = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+robius-file-picker = "0.3.1"
+winit = { version = "0.30", default-features = false }
+
+[package.metadata.android]
+build_targets = ["aarch64-linux-android", "armv7-linux-androideabi"]
+
+[package.metadata.android.sdk]
+min_sdk_version = 26
+target_sdk_version = 35
