@@ -24,7 +24,8 @@ android {
 }
 
 dependencies {
-    // GameActivity provides Android's native text-input/IME integration, unlike NativeActivity.
+    // GameActivity requires AndroidX Core; keep it explicit to avoid JNI startup failures.
+    implementation("androidx.core:core:1.15.0")
     implementation("androidx.games:games-activity:4.4.0")
 }
 
