@@ -23,6 +23,13 @@ android {
     sourceSets["main"].manifest.srcFile("../AndroidManifest.xml")
 }
 
+// Kotlin 1.8+ folds the JDK 7/8 extensions into kotlin-stdlib.
+// Older transitive jdk7/jdk8 artifacts otherwise duplicate those classes.
+configurations.configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk7")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
+}
+
 dependencies {
     // GameActivity's Java API references AppCompatActivity and AndroidX Core.
     implementation("androidx.appcompat:appcompat:1.7.0")
