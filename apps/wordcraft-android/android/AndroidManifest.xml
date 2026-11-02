@@ -8,7 +8,7 @@
         android:label="WordCraft"
         android:resizeableActivity="true"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
         <activity
             android:name="org.wordcraft.android.WordCraftActivity"
