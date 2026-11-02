@@ -65,12 +65,14 @@ jobs:
       - name: Configure Android NDK linker
         shell: bash
         run: |
-          NDK="${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/$(ls "$ANDROID_HOME/ndk" | sort -V | tail -n 1)}"
+          NDK="${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d -printf '%f\\n' | sort -V | tail -n 1)}"
           TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$TOOLCHAIN/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
-          echo "CC_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
-          echo "CXX_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android26-clang++" >> "$GITHUB_ENV"
-          echo "AR_aarch64_linux_android=$TOOLCHAIN/llvm-ar" >> "$GITHUB_ENV"
+          {
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$TOOLCHAIN/aarch64-linux-android26-clang"
+            echo "CC_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android26-clang"
+            echo "CXX_aarch64_linux_android=$TOOLCHAIN/aarch64-linux-android26-clang++"
+            echo "AR_aarch64_linux_android=$TOOLCHAIN/llvm-ar"
+          } >> "$GITHUB_ENV"
 
       - name: Check Android Rust library
         run: cargo check -p wordcraft-android --lib --target aarch64-linux-android
