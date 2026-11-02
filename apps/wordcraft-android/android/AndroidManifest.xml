@@ -11,7 +11,7 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
-            android:name="com.google.androidgamesdk.GameActivity"
+            android:name="org.wordcraft.android.WordCraftActivity"
             android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|uiMode|density"
             android:exported="true"
             android:label="WordCraft"
