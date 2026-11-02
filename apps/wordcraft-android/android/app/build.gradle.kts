@@ -24,7 +24,8 @@ android {
 }
 
 dependencies {
-    // GameActivity requires AndroidX Core; keep it explicit to avoid JNI startup failures.
+    // GameActivity's Java API references AppCompatActivity and AndroidX Core.
+    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.core:core:1.15.0")
     implementation("androidx.games:games-activity:4.4.0")
 }
