@@ -110,25 +110,18 @@ fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
     match purpose {
         "picture" => FileDialog::new()
             .set_title("Choose a picture")
-            .set_filters([
-                ("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"][..]),
-                ("All files", &["*"][..]),
-            ]),
-        "document" => FileDialog::new()
-            .set_title("Open a document")
-            .set_filters([
-                (
-                    "WordCraft documents",
-                    &[
-                        "docx", "docm", "dotx", "dotm", "doc", "dot", "odt", "rtf", "txt",
-                        "md", "markdown", "html", "htm", "tex", "latex", "ltx", "json", "xml",
-                    ][..],
-                ),
-                ("All files", &["*"][..]),
-            ]),
-        _ => FileDialog::new()
-            .set_title("Choose a file")
-            .set_filters([("All files", &["*"][..])]),
+            .set_filters([("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"][..]), ("All files", &["*"][..])]),
+        "document" => FileDialog::new().set_title("Open a document").set_filters([
+            (
+                "WordCraft documents",
+                &[
+                    "docx", "docm", "dotx", "dotm", "doc", "dot", "odt", "rtf", "txt", "md", "markdown", "html", "htm", "tex", "latex", "ltx",
+                    "json", "xml",
+                ][..],
+            ),
+            ("All files", &["*"][..]),
+        ]),
+        _ => FileDialog::new().set_title("Choose a file").set_filters([("All files", &["*"][..])]),
     }
 }
 
@@ -136,33 +129,20 @@ fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
 /// The shared engine currently opens filesystem paths, so the imported copy remains available
 /// after the picker cache is cleaned up and can be listed in the Home library browser.
 #[cfg(target_os = "android")]
-fn stage_picked_file(
-    file: robius_file_picker::PickedFile,
-    library_dir: &Path,
-) -> Result<PathBuf, String> {
-    let display_name = file
-        .file_name()
-        .filter(|name| !name.trim().is_empty())
-        .unwrap_or("document")
-        .to_owned();
+fn stage_picked_file(file: robius_file_picker::PickedFile, library_dir: &Path) -> Result<PathBuf, String> {
+    let display_name = file.file_name().filter(|name| !name.trim().is_empty()).unwrap_or("document").to_owned();
     let safe_name = Path::new(&display_name)
         .file_name()
         .filter(|name| !name.is_empty())
         .map(|name| name.to_os_string())
         .unwrap_or_else(|| std::ffi::OsString::from("document"));
 
-    let local = file
-        .into_local_file()
-        .map_err(|error| format!("Could not read the selected document: {error}"))?;
-    std::fs::create_dir_all(library_dir)
-        .map_err(|error| format!("Could not prepare WordCraft's document library: {error}"))?;
+    let local = file.into_local_file().map_err(|error| format!("Could not read the selected document: {error}"))?;
+    std::fs::create_dir_all(library_dir).map_err(|error| format!("Could not prepare WordCraft's document library: {error}"))?;
 
     let requested_path = library_dir.join(safe_name);
     let staged_path = if requested_path.exists() {
-        let stem = requested_path
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .unwrap_or("document");
+        let stem = requested_path.file_stem().and_then(|value| value.to_str()).unwrap_or("document");
         let extension = requested_path.extension().and_then(|value| value.to_str());
         let mut index = 2_u32;
         loop {
@@ -180,8 +160,7 @@ fn stage_picked_file(
         requested_path
     };
 
-    std::fs::copy(local.path(), &staged_path)
-        .map_err(|error| format!("Could not import the document into WordCraft's library: {error}"))?;
+    std::fs::copy(local.path(), &staged_path).map_err(|error| format!("Could not import the document into WordCraft's library: {error}"))?;
     // The temporary SAF download is cleaned up on drop; the library copy persists.
     Ok(staged_path)
 }
@@ -191,20 +170,11 @@ fn stage_picked_file(
 pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
     // Android's internal data directory is private to this app and survives process restarts.
     // No broad storage permission is needed; users still choose external files through SAF.
-    let library_dir = app
-        .internal_data_path()
-        .map(|path| path.join("WordCraft").join("Documents"));
-    let options = eframe::NativeOptions {
-        android_app: Some(app),
-        ..Default::default()
-    };
-    if let Err(error) = eframe::run_native(
-        "WordCraft",
-        options,
-        Box::new(move |cc| {
-            Ok(Box::new(AndroidHost(create_app(cc.egui_ctx.clone(), library_dir))))
-        }),
-    ) {
+    let library_dir = app.internal_data_path().map(|path| path.join("WordCraft").join("Documents"));
+    let options = eframe::NativeOptions { android_app: Some(app), ..Default::default() };
+    if let Err(error) =
+        eframe::run_native("WordCraft", options, Box::new(move |cc| Ok(Box::new(AndroidHost(create_app(cc.egui_ctx.clone(), library_dir))))))
+    {
         log::error!("WordCraft Android exited with an error: {error}");
     }
 }
