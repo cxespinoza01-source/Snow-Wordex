@@ -49,6 +49,7 @@ pub fn create_app(ctx: eframe::egui::Context, library_dir: Option<PathBuf>) -> W
 
 #[cfg(target_os = "android")]
 fn android_services(ctx: eframe::egui::Context, library_dir: Option<PathBuf>) -> Services {
+    let picker_library_dir = library_dir.clone();
     let file_dialog: Box<dyn Fn(FileDialogRequest) -> Receiver<FileDialogAnswer>> =
         Box::new(move |request| {
             let (tx, rx) = channel();
@@ -71,7 +72,7 @@ fn android_services(ctx: eframe::egui::Context, library_dir: Option<PathBuf>) ->
             let dialog = android_open_dialog(&purpose);
             let callback_repaint = repaint.clone();
             let callback_tx = tx.clone();
-            let library_dir = library_dir.clone();
+            let library_dir = picker_library_dir.clone();
             let callback = move |
                 picked: robius_file_picker::Result<Option<robius_file_picker::PickedFile>>,
             | {
