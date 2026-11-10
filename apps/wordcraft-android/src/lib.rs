@@ -97,6 +97,7 @@ fn android_services(ctx: eframe::egui::Context, library_dir: Option<PathBuf>) ->
 
     Services {
         file_dialog: Some(file_dialog),
+        library_dir,
         ..Services::default()
     }
 }
