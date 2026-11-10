@@ -134,7 +134,7 @@ fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
 
 /// Import a SAF-selected document into WordCraft's persistent, app-private library.
 /// The shared engine currently opens filesystem paths, so the imported copy remains available
-/// after the picker cache is cleaned up and can be listed as a recent document.
+/// after the picker cache is cleaned up and can be listed in the Home library browser.
 #[cfg(target_os = "android")]
 fn stage_picked_file(
     file: robius_file_picker::PickedFile,
