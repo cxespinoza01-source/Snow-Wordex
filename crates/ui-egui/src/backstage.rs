@@ -374,8 +374,6 @@ fn library_list(app: &mut WordApp, ui: &mut Ui) {
     }
     for (name, path) in filtered {
         ui.horizontal(|ui| {
-            ui.add_space(2.0);
-            icons::paint(ui.painter(), Rect::from_min_size(ui.cursor().min, vec2(20.0, 20.0)), "printLayout", t.icon, t.accent);
             if ui.button(&name).on_hover_text(path.to_string_lossy()).clicked() {
                 let failed = open_recent(app, &path.to_string_lossy()).err();
                 ui.ctx().data_mut(|d| d.insert_temp(open_error_id(), failed.unwrap_or_default()));
