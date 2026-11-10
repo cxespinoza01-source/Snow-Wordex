@@ -309,6 +309,8 @@ fn home_page(app: &mut WordApp, ui: &mut Ui) {
             "Good evening"
         },
     );
+    // On Android the managed library is the primary Documents landing surface.
+    library_list(app, ui);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing = vec2(18.0, 0.0);
         for (label, template) in TEMPLATES.into_iter().take(HOME_TEMPLATES) {
@@ -322,7 +324,6 @@ fn home_page(app: &mut WordApp, ui: &mut Ui) {
     }
     ui.add_space(24.0);
     open_list(app, ui);
-    library_list(app, ui);
 }
 
 /// Android's app-private WordCraft library. The host supplies the directory; other platforms
@@ -374,7 +375,7 @@ fn library_list(app: &mut WordApp, ui: &mut Ui) {
     }
     for (name, path) in filtered {
         ui.horizontal(|ui| {
-            if ui.button(&name).on_hover_text(path.to_string_lossy()).clicked() {
+            if ui.button(&name).on_hover_text(path.display().to_string()).clicked() {
                 let failed = open_recent(app, &path.to_string_lossy()).err();
                 ui.ctx().data_mut(|d| d.insert_temp(open_error_id(), failed.unwrap_or_default()));
             }
