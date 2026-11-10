@@ -38,7 +38,13 @@ pub fn create_app(ctx: eframe::egui::Context) -> WordApp {
     let document = wordcraft_engine::blank_document(&region);
     let mut session = Session::new(document);
     session.system_region = region;
-    WordApp::new(session, android_services(ctx))
+    let mut app = WordApp::new(session, android_services(ctx));
+
+    // Android opens directly into WordCraft's document hub (File > Home), rather than
+    // dropping the user into an empty editor. This is the first launcher-shell milestone:
+    // the existing WordApp remains the single editor and owns document navigation.
+    app.start_screen();
+    app
 }
 
 #[cfg(target_os = "android")]
