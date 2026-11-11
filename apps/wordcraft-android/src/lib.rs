@@ -50,51 +50,45 @@ pub fn create_app(ctx: eframe::egui::Context, library_dir: Option<PathBuf>) -> W
 #[cfg(target_os = "android")]
 fn android_services(ctx: eframe::egui::Context, library_dir: Option<PathBuf>) -> Services {
     let picker_library_dir = library_dir.clone();
-    let file_dialog: Box<dyn Fn(FileDialogRequest) -> Receiver<FileDialogAnswer>> =
-        Box::new(move |request| {
-            let (tx, rx) = channel();
-            let repaint = ctx.clone();
+    let file_dialog: Box<dyn Fn(FileDialogRequest) -> Receiver<FileDialogAnswer>> = Box::new(move |request| {
+        let (tx, rx) = channel();
+        let repaint = ctx.clone();
 
-            let purpose = match &request {
-                FileDialogRequest::Open { purpose } | FileDialogRequest::OpenMany { purpose } => {
-                    Some(purpose.clone())
-                }
-                FileDialogRequest::Save { .. } => None,
+        let purpose = match &request {
+            FileDialogRequest::Open { purpose } | FileDialogRequest::OpenMany { purpose } => Some(purpose.clone()),
+            FileDialogRequest::Save { .. } => None,
+        };
+
+        let Some(purpose) = purpose else {
+            log::warn!("Android Save As is not implemented yet; cancelling the save request");
+            let _ = tx.send(Ok(Vec::new()));
+            repaint.request_repaint();
+            return rx;
+        };
+
+        let dialog = android_open_dialog(&purpose);
+        let callback_repaint = repaint.clone();
+        let callback_tx = tx.clone();
+        let library_dir = picker_library_dir.clone();
+        let callback = move |picked: robius_file_picker::Result<Option<robius_file_picker::PickedFile>>| {
+            let answer = match picked {
+                Ok(Some(file)) => match library_dir.as_deref() {
+                    Some(directory) => stage_picked_file(file, directory).map(|path| vec![path.to_string_lossy().into_owned()]),
+                    None => Err("Android did not provide persistent app storage for the document library".to_owned()),
+                },
+                Ok(None) => Ok(Vec::new()),
+                Err(error) => Err(error.to_string()),
             };
+            let _ = callback_tx.send(answer);
+            callback_repaint.request_repaint();
+        };
 
-            let Some(purpose) = purpose else {
-                log::warn!("Android Save As is not implemented yet; cancelling the save request");
-                let _ = tx.send(Ok(Vec::new()));
-                repaint.request_repaint();
-                return rx;
-            };
-
-            let dialog = android_open_dialog(&purpose);
-            let callback_repaint = repaint.clone();
-            let callback_tx = tx.clone();
-            let library_dir = picker_library_dir.clone();
-            let callback = move |
-                picked: robius_file_picker::Result<Option<robius_file_picker::PickedFile>>,
-            | {
-                let answer = match picked {
-                    Ok(Some(file)) => match library_dir.as_deref() {
-                        Some(directory) => stage_picked_file(file, directory)
-                            .map(|path| vec![path.to_string_lossy().into_owned()]),
-                        None => Err("Android did not provide persistent app storage for the document library".to_owned()),
-                    },
-                    Ok(None) => Ok(Vec::new()),
-                    Err(error) => Err(error.to_string()),
-                };
-                let _ = callback_tx.send(answer);
-                callback_repaint.request_repaint();
-            };
-
-            if let Err(error) = dialog.pick_file(callback) {
-                let _ = tx.send(Err(format!("Could not open Android's document picker: {error}")));
-                repaint.request_repaint();
-            }
-            rx
-        });
+        if let Err(error) = dialog.pick_file(callback) {
+            let _ = tx.send(Err(format!("Could not open Android's document picker: {error}")));
+            repaint.request_repaint();
+        }
+        rx
+    });
 
     Services {
         file_dialog: Some(file_dialog),
@@ -102,7 +96,6 @@ fn android_services(ctx: eframe::egui::Context, library_dir: Option<PathBuf>) ->
         ..Services::default()
     }
 }
-
 #[cfg(target_os = "android")]
 fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
     use robius_file_picker::FileDialog;
