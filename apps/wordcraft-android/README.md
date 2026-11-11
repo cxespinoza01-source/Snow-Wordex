@@ -5,9 +5,12 @@ Experimental native Android host for the existing WordCraft Rust engine and egui
 ## Current scope
 
 - Uses Android GameActivity so the host can participate in Android soft-keyboard and text-input handling.
-- Uses the Android system document picker (Storage Access Framework) to open documents. The selected content URI is staged temporarily because the current shared engine reads filesystem paths.
-- Imported staging copies are deleted after parsing. Since the current app does not yet write back to the original SAF URI, the opened document is treated as unsaved and Save must use Save As.
-- Android Save As, write-back to provider URIs, export, clipboard integration, lifecycle recovery and physical-device/Samsung DeX verification are not complete. This branch is not release-ready.
+- Uses the Android system document picker (Storage Access Framework) to import documents into an app-private library at `files/WordCraft/Documents`. The library survives app restarts and requires no broad storage permission.
+- Duplicate file names are preserved by adding a numbered suffix instead of overwriting an existing library document.
+- Android's File > Home remains the document hub and includes a searchable **WordCraft Documents** library listing imported files. Selecting an entry opens it in the shared editor.
+- The temporary SAF download is cleaned up after import, while the copy in WordCraft's private library remains. Since the current app does not yet write back to the original SAF URI, the opened document is treated as unsaved and Save must use Save As.
+- Selecting an entire external folder and retaining its SAF tree permission are not implemented yet; external files are currently imported one at a time.
+- The library browser lists up to 200 imported files and filters by file name. Android Save As/write-back to provider URIs, export, clipboard integration, lifecycle recovery and physical-device/Samsung DeX verification are not complete. This branch is not release-ready.
 
 ## Build prerequisites
 
