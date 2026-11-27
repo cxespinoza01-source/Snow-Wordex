@@ -51,7 +51,7 @@ pub fn create_app(ctx: eframe::egui::Context, library_dir: Option<PathBuf>, init
                 app.start_screen();
             }
         },
-        None => app.start_screen(),
+        None => { app.start_screen(); },
     }
     app
 }
@@ -146,7 +146,7 @@ fn stage_picked_file(file: robius_file_picker::PickedFile, library_dir: &Path) -
 fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, library_dir: &Path) -> Result<Option<PathBuf>, String> {
     use jni::{JavaVM, objects::{JObject, JString, JValue}, refs::Global};
 
-    let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _) }.map_err(|error| format!("Could not connect to Android: {error}"))?;
+    let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _) };
     let activity_raw = app.activity_as_ptr() as jni::sys::jobject;
     let imported = vm
         .attach_current_thread(|env| -> jni::errors::Result<Option<(String, Vec<u8>)>> {
