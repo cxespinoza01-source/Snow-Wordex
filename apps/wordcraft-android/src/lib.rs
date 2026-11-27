@@ -144,7 +144,7 @@ fn stage_picked_file(file: robius_file_picker::PickedFile, library_dir: &Path) -
 /// path-based document engine and keeps it in the library for later reopening.
 #[cfg(target_os = "android")]
 fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, library_dir: &Path) -> Result<Option<PathBuf>, String> {
-    use jni::{JavaVM, objects::{JObject, JString, JValue}, refs::Global};
+    use jni::{jni_sig, jni_str, JavaVM, objects::{JByteArray, JObject, JString, JValue}, refs::Global};
 
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _) };
     let activity_raw = app.activity_as_ptr() as jni::sys::jobject;
@@ -153,11 +153,11 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
             // activity_as_ptr is an unowned JNI global reference. Keep it borrowed as a Global;
             // do not delete it when this function returns.
             let activity = unsafe { env.as_cast_raw::<Global<JObject>>(&activity_raw)? };
-            let intent = env.call_method(activity.as_ref(), "getIntent", "()Landroid/content/Intent;", &[])?.l()?;
+            let intent = env.call_method(activity.as_ref(), jni_str!("getIntent"), jni_sig!("()Landroid/content/Intent;"), &[])?.l()?;
             if intent.is_null() {
                 return Ok(None);
             }
-            let action = env.call_method(&intent, "getAction", "()Ljava/lang/String;", &[])?.l()?;
+            let action = env.call_method(&intent, jni_str!("getAction"), jni_sig!("()Ljava/lang/String;"), &[])?.l()?;
             if action.is_null() {
                 return Ok(None);
             }
@@ -166,17 +166,17 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
                 return Ok(None);
             }
 
-            let uri = env.call_method(&intent, "getData", "()Landroid/net/Uri;", &[])?.l()?;
+            let uri = env.call_method(&intent, jni_str!("getData"), jni_sig!("()Landroid/net/Uri;"), &[])?.l()?;
             if uri.is_null() {
                 return Ok(None);
             }
-            let segment = env.call_method(&uri, "getLastPathSegment", "()Ljava/lang/String;", &[])?.l()?;
+            let segment = env.call_method(&uri, jni_str!("getLastPathSegment"), jni_sig!("()Ljava/lang/String;"), &[])?.l()?;
             let mut name = if segment.is_null() {
                 "shared-document".to_owned()
             } else {
                 env.get_string(&JString::from(segment))?.to_string_lossy().into_owned()
             };
-            let mime = env.call_method(&intent, "getType", "()Ljava/lang/String;", &[])?.l()?;
+            let mime = env.call_method(&intent, jni_str!("getType"), jni_sig!("()Ljava/lang/String;"), &[])?.l()?;
             let mime = if mime.is_null() { String::new() } else {
                 env.get_string(&JString::from(mime))?.to_string_lossy().into_owned()
             };
@@ -187,7 +187,7 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
                 }
             }
 
-            let resolver = env.call_method(activity.as_ref(), "getContentResolver", "()Landroid/content/ContentResolver;", &[])?.l()?;
+            let resolver = env.call_method(activity.as_ref(), jni_str!("getContentResolver"), jni_sig!("()Landroid/content/ContentResolver;"), &[])?.l()?;
             let input = env.call_method(
                 &resolver,
                 "openInputStream",
@@ -201,7 +201,7 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
             let buffer = env.new_byte_array(64 * 1024)?;
             let mut bytes = Vec::new();
             loop {
-                let count = env.call_method(&input, "read", "([B)I", &[JValue::Object(&buffer)])?.i()?;
+                let count = env.call_method(&input, jni_str!("read"), jni_sig!("([B)I"), &[JValue::Object(&buffer)])?.i()?;
                 if count < 0 {
                     break;
                 }
@@ -209,14 +209,15 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
                     continue;
                 }
                 if bytes.len().saturating_add(count as usize) > 128 * 1024 * 1024 {
-                    let _ = env.call_method(&input, "close", "()V", &[]);
+                    let _ = env.call_method(&input, jni_str!("close"), jni_sig!("()V"), &[]);
                     return Err(jni::errors::Error::JavaException);
                 }
                 let mut chunk = vec![0_i8; count as usize];
-                env.get_byte_array_region(&buffer, 0, &mut chunk)?;
+                let byte_array = JByteArray::cast_local(&mut env, buffer)?;
+                byte_array.get_region(&env, 0, &mut chunk)?;
                 bytes.extend(chunk.into_iter().map(|byte| byte as u8));
             }
-            env.call_method(&input, "close", "()V", &[])?;
+            env.call_method(&input, jni_str!("close"), jni_sig!("()V"), &[])?;
             Ok(Some((name, bytes)))
         })
         .map_err(|error| format!("Android could not read the shared document: {error}"))?;
