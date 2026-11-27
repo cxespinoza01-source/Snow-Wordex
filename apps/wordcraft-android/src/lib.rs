@@ -144,7 +144,7 @@ fn stage_picked_file(file: robius_file_picker::PickedFile, library_dir: &Path) -
 /// path-based document engine and keeps it in the library for later reopening.
 #[cfg(target_os = "android")]
 fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, library_dir: &Path) -> Result<Option<PathBuf>, String> {
-    use jni::{JavaVM, objects::{Global, JObject, JString, JValue}};
+    use jni::{JavaVM, objects::{JObject, JString, JValue}, refs::Global};
 
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _) }.map_err(|error| format!("Could not connect to Android: {error}"))?;
     let activity_raw = app.activity_as_ptr() as jni::sys::jobject;
