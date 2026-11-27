@@ -12,7 +12,11 @@ use std::sync::{Mutex, OnceLock};
 #[cfg(target_os = "android")]
 use jni::objects::{JClass, JObject, JString};
 #[cfg(target_os = "android")]
-use jni::{JNIEnv, JavaVM, jni_sig, jni_str};
+use jni::errors::LogErrorAndDefault;
+#[cfg(target_os = "android")]
+use jni::vm::JavaVM;
+#[cfg(target_os = "android")]
+use jni::{Env, EnvUnowned, jni_sig, jni_str};
 
 #[cfg(target_os = "android")]
 use wordcraft_engine::Session;
@@ -122,61 +126,64 @@ fn launch_android_picker() -> Result<(), String> {
         .ok_or_else(|| "Android Activity is not available yet".to_owned())?;
 
     let vm = unsafe { JavaVM::from_raw(vm_ptr as *mut jni::sys::JavaVM) };
-    let mut env = vm
-        .attach_current_thread()
-        .map_err(|error| format!("Could not attach to Android's Java VM: {error}"))?;
-
-    // AndroidApp exposes this as an unowned global reference. Do not delete it.
-    let activity = unsafe { JObject::from_raw(activity_ptr as jni::sys::jobject) };
-    let result = env.call_method(
-        &activity,
-        jni_str!("openDocumentPicker"),
-        jni_sig!("()V"),
-        &[],
-    );
-    std::mem::forget(activity);
-
-    result
-        .map(|_| ())
-        .map_err(|error| format!("Could not launch Android's document picker: {error}"))
+    vm.attach_current_thread(|env| -> jni::errors::Result<()> {
+        // AndroidApp exposes this as an unowned global reference. Wrapping it does not
+        // transfer ownership; do not delete the Java global reference.
+        let activity = unsafe {
+            JObject::from_raw(env, activity_ptr as jni::sys::jobject)
+        };
+        env.call_method(
+            &activity,
+            jni_str!("openDocumentPicker"),
+            jni_sig!("()V"),
+            &[],
+        )?;
+        Ok(())
+    })
+    .map_err(|error| format!("Could not launch Android's document picker: {error}"))?;
 }
 
 /// Called by WordCraftActivity after the SAF result has been copied into the app cache.
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_org_wordcraft_android_WordCraftActivity_nativeOnDocumentPicked(
-    mut env: JNIEnv<'_>,
-    _class: JClass<'_>,
-    path: JString<'_>,
-    error: JString<'_>,
+pub extern "system" fn Java_org_wordcraft_android_WordCraftActivity_nativeOnDocumentPicked<'local>(
+    mut unowned_env: EnvUnowned<'local>,
+    _class: JClass<'local>,
+    path: JString<'local>,
+    error: JString<'local>,
 ) {
-    let path = env
-        .get_string(&path)
-        .map(|value| value.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let error = if error.is_null() {
-        String::new()
-    } else {
-        env.get_string(&error)
-            .map(|value| value.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| "Android could not read the selected document".to_owned())
-    };
+    unowned_env
+        .with_env(|env: &mut Env<'local>| -> jni::errors::Result<()> {
+            // jni 0.22 converts Java strings through JString::to_string().
+            let path = if path.is_null() {
+                String::new()
+            } else {
+                path.to_string()
+            };
+            let error = if error.is_null() {
+                String::new()
+            } else {
+                error.to_string()
+            };
 
-    let sender = pending_picker()
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .take();
+            let sender = pending_picker()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .take();
 
-    if let Some(sender) = sender {
-        let answer = if !error.is_empty() {
-            Err(error)
-        } else if path.is_empty() {
-            Ok(Vec::new()) // User cancelled the system picker.
-        } else {
-            Ok(vec![path])
-        };
-        let _ = sender.send(answer);
-    }
+            if let Some(sender) = sender {
+                let answer = if !error.is_empty() {
+                    Err(error)
+                } else if path.is_empty() {
+                    Ok(Vec::new()) // User cancelled the system picker.
+                } else {
+                    Ok(vec![path])
+                };
+                let _ = sender.send(answer);
+            }
+            Ok(())
+        })
+        .resolve::<LogErrorAndDefault>();
 }
 
 #[cfg(target_os = "android")]
