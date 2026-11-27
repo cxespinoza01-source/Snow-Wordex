@@ -148,7 +148,7 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
 
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _) }.map_err(|error| format!("Could not connect to Android: {error}"))?;
     let activity_raw = app.activity_as_ptr() as jni::sys::jobject;
-    let (display_name, bytes) = vm
+    let imported = vm
         .attach_current_thread(|env| -> jni::errors::Result<Option<(String, Vec<u8>)>> {
             // activity_as_ptr is an unowned JNI global reference. Keep it borrowed as a Global;
             // do not delete it when this function returns.
@@ -219,10 +219,9 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
             env.call_method(&input, "close", "()V", &[])?;
             Ok(Some((name, bytes)))
         })
-        .map_err(|error| format!("Android could not read the shared document: {error}"))?
-        .unwrap_or(None);
+        .map_err(|error| format!("Android could not read the shared document: {error}"))?;
 
-    let Some((display_name, bytes)) = display_name else {
+    let Some((display_name, bytes)) = imported else {
         return Ok(None);
     };
     if bytes.is_empty() {
