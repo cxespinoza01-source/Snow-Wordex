@@ -1,19 +1,35 @@
 //! Native Android host for the shared WordCraft editor.
 //!
-//! Uses GameActivity for Android text input and the system document picker (SAF) for opening files.
-//! Selected SAF content URIs are copied to an app-cache staging path because the shared engine
-//! currently opens filesystem paths. Imported copies are deleted after parsing; the opened document
-//! is left unnamed so Save asks for a destination instead of overwriting an inaccessible cache copy.
+//! Android document access is handled by the platform Storage Access Framework (SAF).
+//! The Activity copies the selected content URI into the app cache and returns a filesystem
+//! path to this host, keeping the Rust editor independent of Android content providers.
 
 #[cfg(target_os = "android")]
-use std::path::{Path, PathBuf};
+use std::sync::mpsc::{Receiver, Sender, channel};
 #[cfg(target_os = "android")]
-use std::sync::mpsc::{Receiver, channel};
+use std::sync::{Mutex, OnceLock};
+
+#[cfg(target_os = "android")]
+use jni::objects::{JClass, JObject, JString};
+#[cfg(target_os = "android")]
+use jni::{JNIEnv, JavaVM, jni_sig, jni_str};
 
 #[cfg(target_os = "android")]
 use wordcraft_engine::Session;
 #[cfg(target_os = "android")]
 use wordcraft_ui_egui::{FileDialogAnswer, FileDialogRequest, Services, WordApp};
+
+#[cfg(target_os = "android")]
+static ANDROID_VM: OnceLock<usize> = OnceLock::new();
+#[cfg(target_os = "android")]
+static ANDROID_ACTIVITY: OnceLock<usize> = OnceLock::new();
+#[cfg(target_os = "android")]
+static PENDING_PICKER: OnceLock<Mutex<Option<Sender<FileDialogAnswer>>>> = OnceLock::new();
+
+#[cfg(target_os = "android")]
+fn pending_picker() -> &'static Mutex<Option<Sender<FileDialogAnswer>>> {
+    PENDING_PICKER.get_or_init(|| Mutex::new(None))
+}
 
 /// Thin eframe host: the shared WordApp owns the editor UI, while the platform binary
 /// implements eframe::App and forwards each frame to it (as the desktop host does).
@@ -31,7 +47,7 @@ impl eframe::App for AndroidHost {
     }
 }
 
-/// Construct the shared editor with Android's document picker service.
+/// Construct the shared editor with Android's native document picker service.
 #[cfg(target_os = "android")]
 pub fn create_app(ctx: eframe::egui::Context) -> WordApp {
     let region = wordcraft_ui_egui::i18n::system_region();
@@ -50,36 +66,39 @@ fn android_services(ctx: eframe::egui::Context) -> Services {
 
             let purpose = match &request {
                 FileDialogRequest::Open { purpose } | FileDialogRequest::OpenMany { purpose } => {
-                    Some(purpose.clone())
+                    purpose.as_str()
                 }
-                FileDialogRequest::Save { .. } => None,
+                FileDialogRequest::Save { .. } => {
+                    let _ = tx.send(Err(
+                        "Android Save As is not implemented yet. The selected document is imported as a copy."
+                            .to_owned(),
+                    ));
+                    repaint.request_repaint();
+                    return rx;
+                }
             };
+            let _ = purpose; // SAF opens any provider-supported document; the engine validates its format.
 
-            let Some(purpose) = purpose else {
-                log::warn!("Android Save As is not implemented yet; cancelling the save request");
-                let _ = tx.send(Ok(Vec::new()));
-                repaint.request_repaint();
-                return rx;
-            };
+            {
+                let mut pending = pending_picker()
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                if pending.is_some() {
+                    let _ = tx.send(Err("A document picker is already open".to_owned()));
+                    repaint.request_repaint();
+                    return rx;
+                }
+                *pending = Some(tx.clone());
+            }
 
-            let dialog = android_open_dialog(&purpose);
-            let callback_repaint = repaint.clone();
-            let callback_tx = tx.clone();
-            let callback = move |
-                picked: robius_file_picker::Result<Option<robius_file_picker::PickedFile>>,
-            | {
-                let answer = match picked {
-                    Ok(Some(file)) => stage_picked_file(file)
-                        .map(|path| vec![path.to_string_lossy().into_owned()]),
-                    Ok(None) => Ok(Vec::new()),
-                    Err(error) => Err(error.to_string()),
-                };
-                let _ = callback_tx.send(answer);
-                callback_repaint.request_repaint();
-            };
-
-            if let Err(error) = dialog.pick_file(callback) {
-                let _ = tx.send(Err(format!("Could not open Android's document picker: {error}")));
+            if let Err(error) = launch_android_picker() {
+                let sender = pending_picker()
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .take();
+                if let Some(sender) = sender {
+                    let _ = sender.send(Err(error));
+                }
                 repaint.request_repaint();
             }
             rx
@@ -91,69 +110,83 @@ fn android_services(ctx: eframe::egui::Context) -> Services {
     }
 }
 
+/// Invoke the Java Activity method using the Activity and VM supplied by android-activity.
+/// We deliberately do not use ndk-context's process context: the SAF launcher requires an Activity.
 #[cfg(target_os = "android")]
-fn android_open_dialog(purpose: &str) -> robius_file_picker::FileDialog {
-    use robius_file_picker::FileDialog;
+fn launch_android_picker() -> Result<(), String> {
+    let vm_ptr = *ANDROID_VM
+        .get()
+        .ok_or_else(|| "Android Java VM is not available yet".to_owned())?;
+    let activity_ptr = *ANDROID_ACTIVITY
+        .get()
+        .ok_or_else(|| "Android Activity is not available yet".to_owned())?;
 
-    match purpose {
-        "picture" => FileDialog::new()
-            .set_title("Choose a picture")
-            .set_filters([
-                ("Images", &["png", "jpg", "jpeg", "gif", "webp", "bmp"][..]),
-                ("All files", &["*"][..]),
-            ]),
-        "document" => FileDialog::new()
-            .set_title("Open a document")
-            .set_filters([
-                (
-                    "WordCraft documents",
-                    &[
-                        "docx", "docm", "dotx", "dotm", "doc", "dot", "odt", "rtf", "txt",
-                        "md", "markdown", "html", "htm", "tex", "latex", "ltx", "json", "xml",
-                    ][..],
-                ),
-                ("All files", &["*"][..]),
-            ]),
-        _ => FileDialog::new()
-            .set_title("Choose a file")
-            .set_filters([("All files", &["*"][..])]),
-    }
+    let vm = unsafe { JavaVM::from_raw(vm_ptr as *mut jni::sys::JavaVM) };
+    let mut env = vm
+        .attach_current_thread()
+        .map_err(|error| format!("Could not attach to Android's Java VM: {error}"))?;
+
+    // AndroidApp exposes this as an unowned global reference. Do not delete it.
+    let activity = unsafe { JObject::from_raw(activity_ptr as jni::sys::jobject) };
+    let result = env.call_method(
+        &activity,
+        jni_str!("openDocumentPicker"),
+        jni_sig!("()V"),
+        &[],
+    );
+    std::mem::forget(activity);
+
+    result
+        .map(|_| ())
+        .map_err(|error| format!("Could not launch Android's document picker: {error}"))
 }
 
-/// Convert the SAF URI to a short-lived regular path for the current path-based engine API.
+/// Called by WordCraftActivity after the SAF result has been copied into the app cache.
 #[cfg(target_os = "android")]
-fn stage_picked_file(file: robius_file_picker::PickedFile) -> Result<PathBuf, String> {
-    let display_name = file
-        .file_name()
-        .filter(|name| !name.trim().is_empty())
-        .unwrap_or("document")
-        .to_owned();
-    let safe_name = Path::new(&display_name)
-        .file_name()
-        .filter(|name| !name.is_empty())
-        .map(|name| name.to_os_string())
-        .unwrap_or_else(|| std::ffi::OsString::from("document"));
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_org_wordcraft_android_WordCraftActivity_nativeOnDocumentPicked(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    path: JString<'_>,
+    error: JString<'_>,
+) {
+    let path = env
+        .get_string(&path)
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let error = if error.is_null() {
+        String::new()
+    } else {
+        env.get_string(&error)
+            .map(|value| value.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| "Android could not read the selected document".to_owned())
+    };
 
-    let local = file
-        .into_local_file()
-        .map_err(|error| format!("Could not read the selected document: {error}"))?;
-    let picker_dir = local
-        .path()
-        .parent()
-        .ok_or_else(|| "The selected file has no cache directory".to_owned())?;
-    let staging_dir = picker_dir.join("wordcraft-open");
-    std::fs::create_dir_all(&staging_dir)
-        .map_err(|error| format!("Could not prepare the document cache: {error}"))?;
-    let staged_path = staging_dir.join(safe_name);
-    std::fs::copy(local.path(), &staged_path)
-        .map_err(|error| format!("Could not copy the selected document into the cache: {error}"))?;
-    // The local temporary file is dropped here; the staged copy survives until WordApp parses it.
-    Ok(staged_path)
+    let sender = pending_picker()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .take();
+
+    if let Some(sender) = sender {
+        let answer = if !error.is_empty() {
+            Err(error)
+        } else if path.is_empty() {
+            Ok(Vec::new()) // User cancelled the system picker.
+        } else {
+            Ok(vec![path])
+        };
+        let _ = sender.send(answer);
+    }
 }
 
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
 pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
+    // Keep the exact Activity reference for the SAF bridge. android-activity already
+    // initializes its Android context; do not initialize ndk-context a second time.
+    let _ = ANDROID_VM.set(app.vm_as_ptr() as usize);
+    let _ = ANDROID_ACTIVITY.set(app.activity_as_ptr() as usize);
+
     let options = eframe::NativeOptions {
         android_app: Some(app),
         ..Default::default()
