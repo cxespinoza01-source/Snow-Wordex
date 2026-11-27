@@ -144,7 +144,7 @@ fn stage_picked_file(file: robius_file_picker::PickedFile, library_dir: &Path) -
 /// path-based document engine and keeps it in the library for later reopening.
 #[cfg(target_os = "android")]
 fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, library_dir: &Path) -> Result<Option<PathBuf>, String> {
-    use jni::{jni_sig, jni_str, JavaVM, objects::{JByteArray, JObject, JString, JValue}, refs::Global};
+    use jni::{jni_sig, jni_str, JavaVM, objects::{JObject, JString, JValue}, refs::Global};
 
     let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as _) };
     let activity_raw = app.activity_as_ptr() as jni::sys::jobject;
@@ -213,8 +213,7 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
                     return Err(jni::errors::Error::JavaException);
                 }
                 let mut chunk = vec![0_i8; count as usize];
-                let byte_array = JByteArray::cast_local(&mut env, buffer)?;
-                byte_array.get_region(&env, 0, &mut chunk)?;
+                buffer.get_region(&env, 0, &mut chunk)?;
                 bytes.extend(chunk.into_iter().map(|byte| byte as u8));
             }
             env.call_method(&input, jni_str!("close"), jni_sig!("()V"), &[])?;
