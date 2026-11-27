@@ -162,7 +162,7 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
                 return Ok(None);
             }
             let action: String = env.get_string(&JString::from(action))?.to_string_lossy().into_owned();
-            if action != "android.intent.action.VIEW" {
+            if action != "android.intent.action.VIEW" && action != "android.intent.action.EDIT" {
                 return Ok(None);
             }
 
