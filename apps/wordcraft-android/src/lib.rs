@@ -281,6 +281,21 @@ fn unique_library_path(library_dir: &Path, display_name: &str) -> PathBuf {
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
 pub fn android_main(app: winit::platform::android::activity::AndroidApp) {
+    // eframe/winit supplies AndroidApp directly and does not initialize ndk-context.
+    // robius-file-picker accesses the current Activity through robius-android-env,
+    // which reads that context from ndk-context. Register the live VM and Activity
+    // before constructing the editor or invoking the SAF picker.
+    //
+    // SAFETY: both pointers are owned by AndroidApp and remain valid for the
+    // lifetime of this Android entry point. This is the single initialization
+    // for this process; the application does not use ndk-glue.
+    unsafe {
+        ndk_context::initialize_android_context(
+            app.vm_as_ptr().cast(),
+            app.activity_as_ptr().cast(),
+        );
+    }
+
     // The library is private to WordCraft and survives process restarts. External documents
     // arrive through SAF or ACTION_VIEW; neither needs broad storage permissions.
     let library_dir = app.internal_data_path().map(|path| path.join("WordCraft").join("Documents"));
