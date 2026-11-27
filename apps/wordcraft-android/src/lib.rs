@@ -161,7 +161,7 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
             if action.is_null() {
                 return Ok(None);
             }
-            let action: String = env.get_string(&JString::from(action))?.to_string_lossy().into_owned();
+            let action: String = JString::cast_local(env, action)?.try_to_string(env)?;
             if action != "android.intent.action.VIEW" && action != "android.intent.action.EDIT" {
                 return Ok(None);
             }
@@ -174,11 +174,11 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
             let mut name = if segment.is_null() {
                 "shared-document".to_owned()
             } else {
-                env.get_string(&JString::from(segment))?.to_string_lossy().into_owned()
+                JString::cast_local(env, segment)?.try_to_string(env)?
             };
             let mime = env.call_method(&intent, jni_str!("getType"), jni_sig!("()Ljava/lang/String;"), &[])?.l()?;
             let mime = if mime.is_null() { String::new() } else {
-                env.get_string(&JString::from(mime))?.to_string_lossy().into_owned()
+                JString::cast_local(env, mime)?.try_to_string(env)?
             };
             if Path::new(&name).extension().is_none() {
                 if let Some(extension) = extension_for_mime(&mime) {
@@ -190,8 +190,8 @@ fn import_shared_document(app: &winit::platform::android::activity::AndroidApp, 
             let resolver = env.call_method(activity.as_ref(), jni_str!("getContentResolver"), jni_sig!("()Landroid/content/ContentResolver;"), &[])?.l()?;
             let input = env.call_method(
                 &resolver,
-                "openInputStream",
-                "(Landroid/net/Uri;)Ljava/io/InputStream;",
+                jni_str!("openInputStream"),
+                jni_sig!("(Landroid/net/Uri;)Ljava/io/InputStream;"),
                 &[JValue::Object(&uri)],
             )?.l()?;
             if input.is_null() {
