@@ -141,6 +141,7 @@ fn launch_android_picker() -> Result<(), String> {
         Ok(())
     })
     .map_err(|error| format!("Could not launch Android's document picker: {error}"))?;
+    Ok(())
 }
 
 /// Called by WordCraftActivity after the SAF result has been copied into the app cache.
@@ -153,7 +154,7 @@ pub extern "system" fn Java_org_wordcraft_android_WordCraftActivity_nativeOnDocu
     error: JString<'local>,
 ) {
     unowned_env
-        .with_env(|env: &mut Env<'local>| -> jni::errors::Result<()> {
+        .with_env(|_env: &mut Env<'local>| -> jni::errors::Result<()> {
             // jni 0.22 converts Java strings through JString::to_string().
             let path = if path.is_null() {
                 String::new()
