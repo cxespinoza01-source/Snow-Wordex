@@ -120,6 +120,14 @@ pub(super) fn sane_dim(v: f32, cap: f32) -> f32 {
     if v.is_finite() { v.clamp(1.0, cap) } else { 72.0 }
 }
 
+/// Page Width normally follows the available width. On Android desktop windows, also cap it
+/// by the available height so a wide maximized window cannot scale a page past the work area.
+fn page_width_scale(avail: egui::Vec2, maxw: f32, maxh: f32, limit_height: bool) -> f32 {
+    let width = (avail.x - 2.0 * GAP - 20.0) / maxw;
+    let scale = if limit_height { width.min((avail.y - 2.0 * GAP) / maxh) } else { width };
+    scale.clamp(0.05, 6.0)
+}
+
 /// How many pages fit side by side: as many slots of `slot_px` (a page plus its markup area, on
 /// screen) as the width holds with a gap around each, like Word's Print Layout when zoomed out.
 /// At least `min_cols`, never more than `pages` (or 1 when `auto` is off and `min_cols` is 1).
@@ -179,7 +187,7 @@ pub fn geometry(app: &WordApp, l: &DocLayout, avail: egui::Vec2) -> Geometry {
         return Geometry { rects, size, scale, cols: sizes.len().max(1), bands };
     }
     match v.fit.as_str() {
-        "pageWidth" => scale = ((avail.x - 2.0 * GAP - 20.0) / maxw).clamp(0.1, 6.0),
+        "pageWidth" => scale = page_width_scale(avail, maxw, maxh, cfg!(target_os = "android")),
         "onePage" => scale = ((avail.y - 2.0 * GAP) / maxh).min((avail.x - 2.0 * GAP) / maxw).clamp(0.05, 6.0),
         "multiplePages" => scale = ((avail.y - 2.0 * GAP) / maxh).min((avail.x - 3.0 * GAP) / (2.0 * maxw)).clamp(0.05, 6.0),
         _ => {}
@@ -237,4 +245,28 @@ pub fn sync_fit_zoom(app: &mut WordApp, scale: f32) {
         return;
     }
     v.zoom = (scale / PX_PER_PT).clamp(0.1, 5.0);
+}
+
+
+#[cfg(test)]
+mod responsive_tests {
+    use super::*;
+
+    #[test]
+    fn android_page_width_fit_respects_both_window_dimensions() {
+        let available = vec2(1600.0, 700.0);
+        let page_w = 800.0;
+        let page_h = 1100.0;
+        let width_only = page_width_scale(available, page_w, page_h, false);
+        let bounded = page_width_scale(available, page_w, page_h, true);
+        assert!(bounded <= width_only);
+        assert!(page_h * bounded <= available.y - 2.0 * GAP + 0.1);
+    }
+
+    #[test]
+    fn page_width_fit_keeps_existing_width_behavior_when_unbounded() {
+        let available = vec2(1200.0, 900.0);
+        let expected = ((available.x - 2.0 * GAP - 20.0) / 800.0).clamp(0.05, 6.0);
+        assert!((page_width_scale(available, 800.0, 1100.0, false) - expected).abs() < 0.001);
+    }
 }

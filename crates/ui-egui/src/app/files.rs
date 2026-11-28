@@ -451,9 +451,6 @@ impl WordApp {
     pub(crate) fn forget_temporary_import_path(&mut self, path: &str) {
         self.session.path = None;
         self.autosave_path = None;
-        self.session.file_name = std::path::Path::new(path)
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned());
+        self.session.file_name = std::path::Path::new(path).file_name().map(|name| name.to_string_lossy().into_owned());
     }
-
 }

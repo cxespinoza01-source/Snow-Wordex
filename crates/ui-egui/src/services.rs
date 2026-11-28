@@ -88,6 +88,9 @@ pub struct Services {
     /// `xdg-mime`. `None` (web, macOS) hides the button; macOS shows how to do it in Finder
     /// instead. An error means nothing changed.
     pub make_default_app: Option<Box<dyn Fn() -> Result<DefaultApp, String>>>,
+    /// Optional app-owned document library shown on File › Home (Android launcher host).
+    /// Hosts that do not provide a managed library leave this unset.
+    pub library_dir: Option<std::path::PathBuf>,
     /// Desktop: the app's own user templates folder (`Templates` in the settings folder, #2852),
     /// used while File › Options names none. File › New lists personal templates from it and Save
     /// as Word Template starts in it. `None` (web) hides personal templates.

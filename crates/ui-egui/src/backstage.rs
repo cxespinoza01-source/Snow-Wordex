@@ -309,6 +309,8 @@ fn home_page(app: &mut WordApp, ui: &mut Ui) {
             "Good evening"
         },
     );
+    // On Android the managed library is the primary Documents landing surface.
+    library_list(app, ui);
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing = vec2(18.0, 0.0);
         for (label, template) in TEMPLATES.into_iter().take(HOME_TEMPLATES) {
@@ -322,6 +324,63 @@ fn home_page(app: &mut WordApp, ui: &mut Ui) {
     }
     ui.add_space(24.0);
     open_list(app, ui);
+}
+
+/// Android's app-private WordCraft library. The host supplies the directory; other platforms
+/// leave it unset and keep the existing Home page unchanged.
+fn library_list(app: &mut WordApp, ui: &mut Ui) {
+    let Some(directory) = app.services.library_dir.clone() else { return };
+    let t = Tokens::get(ui.ctx());
+    ui.add_space(24.0);
+    ui.label(egui::RichText::new(tl!("WordCraft Documents")).font(semibold(16.0)));
+    ui.add_space(6.0);
+
+    let search_id = app.window_id("wordcraft_library_search");
+    let mut query = ui.ctx().data(|d| d.get_temp::<String>(search_id)).unwrap_or_default();
+    let response = ui.add(egui::TextEdit::singleline(&mut query).hint_text(tl!("Search your library")).desired_width(360.0));
+    if response.changed() {
+        ui.ctx().data_mut(|d| d.insert_temp(search_id, query.clone()));
+    }
+
+    let mut files = Vec::new();
+    let mut read_error = None;
+    match std::fs::read_dir(&directory) {
+        Ok(entries) => {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if name.starts_with('.') || !path.is_file() {
+                    continue;
+                }
+                files.push((name, path));
+            }
+            files.sort_by_cached_key(|(name, _)| name.to_lowercase());
+        }
+        Err(error) => read_error = Some(error.to_string()),
+    }
+
+    if let Some(error) = read_error {
+        ui.label(egui::RichText::new(format!("{}: {error}", tl!("Library unavailable"))).color(ui.visuals().error_fg_color));
+        return;
+    }
+    let needle = query.trim().to_lowercase();
+    let filtered = files.iter().filter(|(name, _)| needle.is_empty() || name.to_lowercase().contains(&needle)).take(200).cloned().collect::<Vec<_>>();
+    if filtered.is_empty() {
+        let message = if files.is_empty() { tl!("Documents you import will appear here.") } else { tl!("No documents match your search.") };
+        ui.label(egui::RichText::new(message).color(t.text_dim));
+        return;
+    }
+    for (name, path) in filtered {
+        ui.horizontal(|ui| {
+            if ui.button(&name).on_hover_text(path.display().to_string()).clicked() {
+                let failed = open_recent(app, &path.to_string_lossy()).err();
+                ui.ctx().data_mut(|d| d.insert_temp(open_error_id(), failed.unwrap_or_default()));
+            }
+        });
+    }
+    if files.len() > 200 {
+        ui.label(egui::RichText::new(tl!("Showing the first 200 documents.")).small().color(t.text_dim));
+    }
 }
 
 /// New: the whole template gallery with a search box, then the personal templates (#2852); no
