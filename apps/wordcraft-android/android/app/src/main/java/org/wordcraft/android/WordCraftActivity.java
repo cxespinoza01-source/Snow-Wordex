@@ -22,7 +22,10 @@ import java.io.OutputStream;
  * content URI is copied into the app cache, then its ordinary path is returned to Rust.
  */
 public final class WordCraftActivity extends GameActivity {
-    private ActivityResultLauncher<String[]> documentPicker;\n    private ActivityResultLauncher<String> saveDocumentPicker;\n    private Uri currentSaveUri;\n    private String pendingSaveName = "Document.docx";
+    private ActivityResultLauncher<String[]> documentPicker;
+    private ActivityResultLauncher<String> saveDocumentPicker;
+    private Uri currentSaveUri;
+    private String pendingSaveName = "Document.docx";
 
     static {
         System.loadLibrary("wordcraft_android");
