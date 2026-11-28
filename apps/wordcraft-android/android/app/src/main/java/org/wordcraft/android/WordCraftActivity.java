@@ -22,7 +22,7 @@ import java.io.OutputStream;
  * content URI is copied into the app cache, then its ordinary path is returned to Rust.
  */
 public final class WordCraftActivity extends GameActivity {
-    private ActivityResultLauncher<String[]> documentPicker;
+    private ActivityResultLauncher<String[]> documentPicker;\n    private ActivityResultLauncher<String> saveDocumentPicker;\n    private Uri currentSaveUri;\n    private String pendingSaveName = "Document.docx";
 
     static {
         System.loadLibrary("wordcraft_android");
@@ -34,6 +34,10 @@ public final class WordCraftActivity extends GameActivity {
         documentPicker = registerForActivityResult(
                 new ActivityResultContracts.OpenDocument(),
                 this::onDocumentPicked
+        );
+        saveDocumentPicker = registerForActivityResult(
+                new ActivityResultContracts.CreateDocument("application/octet-stream"),
+                this::onSaveDocumentPicked
         );
     }
 
@@ -50,6 +54,66 @@ public final class WordCraftActivity extends GameActivity {
                 nativeOnDocumentPicked("", error.getMessage());
             }
         });
+    }
+
+    /** Launch Android's system dialog to create a document at a provider-selected location. */
+    public void createDocument(String suggestedName) {
+        runOnUiThread(() -> {
+            if (saveDocumentPicker == null) {
+                nativeOnDocumentPicked("", "Android save picker is not ready");
+                return;
+            }
+            String safeName = suggestedName == null ? "Document.docx" : suggestedName;
+            safeName = safeName.replaceAll("[\\\\/\\p{Cntrl}]", "_");
+            if (safeName.trim().isEmpty() || ".".equals(safeName) || "..".equals(safeName)) {
+                safeName = "Document.docx";
+            }
+            pendingSaveName = safeName;
+            try {
+                saveDocumentPicker.launch(pendingSaveName);
+            } catch (RuntimeException error) {
+                nativeOnDocumentPicked("", error.getMessage());
+            }
+        });
+    }
+
+    private void onSaveDocumentPicked(Uri uri) {
+        if (uri == null) {
+            nativeOnDocumentPicked("", null);
+            return;
+        }
+        currentSaveUri = uri;
+        String displayName = pendingSaveName;
+        try (Cursor cursor = getContentResolver().query(
+                uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int nameColumn = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (nameColumn >= 0) {
+                    String value = cursor.getString(nameColumn);
+                    if (value != null && !value.trim().isEmpty()) {
+                        displayName = value;
+                    }
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // The suggested name is still a valid logical name if a provider omits metadata.
+        }
+        nativeOnDocumentPicked(displayName, null);
+    }
+
+    /** Write bytes produced by WordCraft to the URI most recently selected above. */
+    public void writeDocument(byte[] bytes) throws Exception {
+        Uri target = currentSaveUri;
+        if (target == null) {
+            throw new IllegalStateException("Choose a save location before saving this document");
+        }
+        try (OutputStream output = getContentResolver().openOutputStream(target, "wt")) {
+            if (output == null) {
+                throw new IllegalStateException("Android could not open the selected document for writing");
+            }
+            output.write(bytes);
+            output.flush();
+        }
     }
 
     private void onDocumentPicked(Uri uri) {
